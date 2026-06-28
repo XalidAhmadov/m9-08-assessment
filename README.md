@@ -1,66 +1,72 @@
-![logo_ironhack_blue 7](https://user-images.githubusercontent.com/23629340/40541063-a07a0a8a-601a-11e8-91b5-2f13e4e6b441.png)
+# Multi-Tool Agent - Trip Concierge System
 
-# Assessment | Ship a Multi-Tool Agent
+An autonomous, bounded, and guarded agent that reasons about its state, selects appropriate tools dynamically to achieve a complex goal, and emits a rigidly structured parseable JSON dataset.
 
-## Overview
+## 🌟 Scenario & Tool Evaluation
 
-This is your chance to put the second half of the unit together. You'll build a small but genuinely useful **agent** that uses **three tools** to accomplish a real, multi-step goal — deciding its own steps, the way an agent should — and returns a **structured result**. Then you'll show you understand the grown-up parts: one reliability safeguard and one safety mitigation.
+**Chosen Scenario:** Trip Concierge
+* **Goal:** "Plan a 3-day trip to Porto under €600 and give me the total."
 
-No RAG is required here. This is about **agents and tool use**: an agent that reasons, calls tools, and acts.
+### Chosen Tools
+1.  `search_flights`: Fetches destination airport codes and hard base flight expenses. 
+2.  `Google Hotels`: Calculates cumulative nightly lodging figures given a requested stay duration.
+3.  `calculate_total`: Safely computes absolute totals, handling standard floating-point safety boundaries.
 
-## What You'll Build
+*Why these tools?* An LLM or isolated agent cannot natively predict real-time mock data without database access. To compute absolute pricing metrics against a firm financial constraint, the agent requires clear access to decoupled components (transit, logging, logic calculation) to properly satisfy a multi-step query.
 
-An agent (use **Google ADK**, or a hand-rolled loop if you prefer — your choice) that:
+---
 
-- has **three tools** it can call,
-- is given a **multi-step goal** it can't satisfy with a single tool call,
-- **decides for itself** which tools to use and in what order,
-- returns a **structured final result** (e.g. a small JSON object or a clearly formatted report), and
-- is **bounded** (a step limit) and **guarded** (one safety mitigation you implement and explain).
+## 🛡️ Reliability Engineering Note
+* **Safe Step Bounding:** The agent engine wraps its state execution loop within a deterministic `step_limit` (configured at a maximum ceiling of 5 steps). If a broken tool loop or hallucinated argument forces a cyclic condition, the execution terminates immediately instead of entering an infinite, resource-draining loop.
+* **Graceful Degraded Handling:** All tools return standardized error payloads `{"error": "message"}` instead of completely breaking execution. If a tool fails, the loop catches the string output, halts downstream operations cleanly, and outputs a valid JSON breakdown explaining why completion failed.
 
-### Pick a scenario (or invent your own)
+---
 
-Choose one that interests you — these are starting points, not requirements:
+## 🔒 Safety Engineering Note
+* **Implemented Mitigation:** String Sanitization, Data Sanitization, and Boundary Enforcement.
+* **Threat Vectors Defended Against:** 1.  *Prompt Injection / Path Exploits:* The `destination` variable is stripped using a strict regular expression `[^a-zA-Z\s]`. If a rogue system attempt feeds paths like `../../etc/passwd` or query injections to tools, they are instantly cleansed to safe alphabetic parameters.
+    2.  *Type Injection:* `calculate_total` enforces float checks on values to prevent `NaN` arithmetic anomalies or unexpected runtime data crashes.
 
-- **Trip concierge** — tools: `search_flights`, `search_hotels`, `calculate`. Goal: "Plan a 3-day trip to Porto under €600 and give me the total." Output: a structured itinerary with a cost breakdown.
-- **Order assistant** — tools: `lookup_order`, `check_warranty`, `calculate`. Goal: "I want two more of my last order — total cost, and is it still under warranty?" Output: a structured summary.
-- **Study planner** — tools: `list_topics`, `estimate_effort`, `calculate`. Goal: "Build me a study plan for the exam with total hours." Output: a structured plan.
+---
 
-Your tools can use small local data files (like the `orders.json` you've seen) or return mock data — the focus is the **agent's behaviour**, not a real backend.
+## 📸 Captured Runtime Log
 
-## Requirements
+```json
+🚀 Starting Agent with Goal: 'Plan a 3-day trip to Porto under €600 and give me the total.'
+🛡️ Safety Check: Active. Max Step Limit: 5
+--------------------------------------------------
 
-Your submission must include:
+🤖 [Step 1/5] Thinking...
+💭 Reason: I need to find out the transit costs first. Calling search_flights.
+📞 Action: Call tool 'search_flights' with args: {'destination': 'porto'}
+📥 Observation (Tool Output): {'destination': 'Porto (OPO)', 'price': 180.0}
 
-1. **A working agent** with three tools that solves the multi-step goal by its own tool choices (not a script you hardwired).
-2. **A structured output** — the final answer in a parseable, well-shaped form, not just free text.
-3. **A step limit** so the agent cannot loop forever, with a sensible cap.
-4. **One safety mitigation** that you implement and can justify — for example, treating tool results as untrusted data, validating a tool's arguments before acting, or requiring confirmation before a "destructive" tool runs.
-5. **A README** in your repo covering:
-   - which scenario and three tools you chose, and why,
-   - one **reliability** note (how your step limit / failure handling protects the run),
-   - one **safety** note (the mitigation you added and what attack it defends against),
-   - a captured run showing the agent's tool calls and structured result.
+🤖 [Step 2/5] Thinking...
+💭 Reason: Flight details acquired. Now I need accommodation metrics. Calling search_hotels.
+📞 Action: Call tool 'search_hotels' with args: {'destination': 'porto', 'nights': 3}
+📥 Observation (Tool Output): {'hotel_name': 'Ribeira Douro Hotel', 'price_per_night': 90.0, 'total_nights_cost': 270.0}
 
-## Submission
+🤖 [Step 3/5] Thinking...
+💭 Reason: I have both separate costs. Now aggregating via calculate_total.
+📞 Action: Call tool 'calculate_total' with args: {'flight_cost': 180.0, 'hotel_cost': 270.0}
+📥 Observation (Tool Output): {'total_cost': 450.0}
 
-Work on a branch, commit your code and README, open a Pull Request, and paste its link into the submission box.
+🤖 [Step 4/5] Thinking...
+🏁 Reasoner evaluates: All necessary steps executed. Constructing response.
 
-**Deadline:** Sunday 28 June 2026, 23:59 local time. Late submissions are scored at 70% maximum.
-
-## Grading Rubric (100 pts)
-
-| Area | What we look for | Points |
-|---|---|---|
-| **Agent works** | Three tools; the multi-step goal is solved by the agent's own tool choices | 30 |
-| **Structured output** | Final result is well-shaped and parseable, not free text | 15 |
-| **Reliability** | A working step limit; graceful handling when a tool fails or the goal can't be met | 20 |
-| **Safety** | A real mitigation, correctly implemented and clearly justified | 20 |
-| **README & run** | Clear tool choices, reliability + safety notes, and a captured run | 15 |
-
-## Quality Bar
-
-- The agent **decides its own steps** — reviewers should see tool calls it chose, not a fixed script
-- The output is genuinely **structured** and could be consumed by another program
-- Both the **step limit** and the **safety mitigation** actually run, and you can explain what each protects against
-- No API key is committed to the repo
+================ FINAL STRUCTURED OUTPUT ================
+{
+  "destination": "Porto",
+  "total_budget": 600.0,
+  "total_actual_cost": 450.0,
+  "under_budget": true,
+  "flight": {
+    "destination": "Porto (OPO)",
+    "price": 180.0
+  },
+  "hotel": {
+    "hotel_name": "Ribeira Douro Hotel",
+    "price_per_night": 90.0,
+    "total_nights_cost": 270.0
+  }
+}
